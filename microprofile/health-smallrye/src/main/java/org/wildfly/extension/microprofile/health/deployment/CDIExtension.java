@@ -22,20 +22,6 @@
 
 package org.wildfly.extension.microprofile.health.deployment;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-
-import javax.enterprise.event.Observes;
-import javax.enterprise.inject.Instance;
-import javax.enterprise.inject.spi.AfterDeploymentValidation;
-import javax.enterprise.inject.spi.BeanManager;
-import javax.enterprise.inject.spi.BeforeShutdown;
-import javax.enterprise.inject.spi.Extension;
-import javax.enterprise.inject.spi.ProcessAnnotatedType;
-import javax.enterprise.util.AnnotationLiteral;
-
 import io.smallrye.health.SmallRyeHealthReporter;
 import org.eclipse.microprofile.config.Config;
 import org.eclipse.microprofile.config.ConfigProvider;
@@ -47,11 +33,32 @@ import org.eclipse.microprofile.health.Readiness;
 import org.jboss.modules.Module;
 import org.wildfly.extension.microprofile.health.HealthReporter;
 
+import javax.enterprise.event.Observes;
+import javax.enterprise.inject.Any;
+import javax.enterprise.inject.Instance;
+import javax.enterprise.inject.spi.AfterDeploymentValidation;
+import javax.enterprise.inject.spi.BeanManager;
+import javax.enterprise.inject.spi.BeforeShutdown;
+import javax.enterprise.inject.spi.CDI;
+import javax.enterprise.inject.spi.Extension;
+import javax.enterprise.inject.spi.ProcessAnnotatedType;
+import javax.enterprise.util.AnnotationLiteral;
+import javax.naming.InitialContext;
+import javax.naming.NamingException;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.logging.Logger;
+
 /**
  * @author <a href="http://jmesnil.net/">Jeff Mesnil</a> (c) 2017 Red Hat inc.
  */
 public class CDIExtension implements Extension {
 
+    private static final Logger LOGGER = Logger.getLogger(CDIExtension.class.getName());
     private final HealthReporter reporter;
     private final Module module;
 
@@ -74,15 +81,21 @@ public class CDIExtension implements Extension {
     public CDIExtension(HealthReporter healthReporter, Module module) {
         this.reporter = healthReporter;
         this.module = module;
-
     }
 
     /**
      * Get CDI <em>instances</em> of HealthCheck and
      * add them to the {@link HealthReporter}.
      */
-    private void afterDeploymentValidation(@Observes final AfterDeploymentValidation avd, BeanManager bm) {
-        instance = bm.createInstance();
+    private void afterDeploymentValidation(@Observes final AfterDeploymentValidation avd) throws NamingException {
+
+        System.out.println("");
+        System.out.println("After deployment validation " + module.getName());
+        BeanManager beanManager = tryGetBeanManagerFromJndiLookup()
+                .orElseGet(() -> CDI.current().getBeanManager());
+        instance = beanManager.createInstance();
+        System.out.println(module.getClassLoader());
+        System.out.println(Arrays.toString(instance.select(HealthCheck.class, Any.Literal.INSTANCE).stream().toArray(HealthCheck[]::new)));
 
         addHealthChecks(HealthLiteral.INSTANCE, reporter::addHealthCheck, healthChecks);
         addHealthChecks(Liveness.Literal.INSTANCE, reporter::addLivenessCheck, livenessChecks);
@@ -95,6 +108,16 @@ public class CDIExtension implements Extension {
                 defaultReadinessCheck = new DefaultReadinessHealthCheck(module.getName());
                 reporter.addReadinessCheck(defaultReadinessCheck, module.getClassLoader());
             }
+        }
+    }
+
+    private Optional<BeanManager> tryGetBeanManagerFromJndiLookup() {
+        try {
+            BeanManager jndiBeanManager = InitialContext.doLookup("java:comp/BeanManager");
+            return Optional.of(jndiBeanManager);
+        } catch (NamingException e) {
+            LOGGER.fine("Could not get BeanManager instance using JNDI lookup for java:comp/BeanManager : " + e.getMessage());
+            return Optional.empty();
         }
     }
 

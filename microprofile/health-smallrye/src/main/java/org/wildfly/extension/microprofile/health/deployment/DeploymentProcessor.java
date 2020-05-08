@@ -56,7 +56,9 @@ public class DeploymentProcessor implements DeploymentUnitProcessor {
                     deploymentUnit.getName(),
                     WELD_CAPABILITY_NAME);
         }
-        if (weldCapability.isPartOfWeldDeployment(deploymentUnit)) {
+        // Only one instance of the extension will be registered, use the parent one
+        boolean isRootDeploymentUnit = deploymentUnit.getParent() == null;
+        if (weldCapability.isPartOfWeldDeployment(deploymentUnit) && isRootDeploymentUnit) {
             final HealthReporter healthReporter = (HealthReporter) phaseContext.getServiceRegistry().getService(MicroProfileHealthSubsystemDefinition.HEALTH_REPORTER_SERVICE).getValue();
 
             weldCapability.registerExtensionInstance(new CDIExtension(healthReporter, module), deploymentUnit);

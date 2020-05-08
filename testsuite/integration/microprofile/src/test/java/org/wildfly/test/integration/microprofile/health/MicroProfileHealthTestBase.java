@@ -89,7 +89,6 @@ public abstract class MicroProfileHealthTestBase {
 
         ear.setApplicationXML(new StringAsset("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                 + "<application xmlns=\"http://xmlns.jcp.org/xml/ns/javaee\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xsi:schemaLocation=\"http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/application_7.xsd\" version=\"7\">\n"
-                + "  <display-name>" + EAR_ARCHIVE_NAME + "</display-name>\n"
                 + "  <module>\n"
                 + "    <web>\n"
                 + "      <web-uri>" + WAR_ARCHIVE_NAME + "</web-uri>\n"
@@ -98,6 +97,7 @@ public abstract class MicroProfileHealthTestBase {
                 + "  </module>\n"
                 + "</application>"));
 
+        System.out.println(ear.toString(true));
         return ear;
     }
 
